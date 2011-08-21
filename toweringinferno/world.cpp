@@ -84,10 +84,22 @@ bool isDeltaWithDirection(
 	const TCOD_keycode_t direction
 	)
 {
-	return deltaX < 0 && (direction == TCODK_LEFT)
-		|| deltaX > 0 && (direction == TCODK_RIGHT)
-		|| deltaY < 0 && (direction == TCODK_UP)
-		|| deltaY > 0 && (direction == TCODK_DOWN);
+	return deltaX < 0 && deltaY == 0 && (direction == TCODK_LEFT || direction == TCODK_KP4)
+		|| deltaX > 0 && deltaY == 0 && (direction == TCODK_RIGHT || direction == TCODK_KP6)
+		|| deltaY < 0 && deltaX == 0 && (direction == TCODK_UP || direction == TCODK_KP8)
+		|| deltaY > 0 && deltaX == 0 && (direction == TCODK_DOWN || direction == TCODK_KP2)
+		|| deltaX < 0 && deltaY < 0 && direction == TCODK_KP7
+		|| deltaX > 0 && deltaY < 0 && direction == TCODK_KP9
+		|| deltaX < 0 && deltaY > 0 && direction == TCODK_KP1
+		|| deltaX > 0 && deltaY > 0 && direction == TCODK_KP3;
+}
+
+inline 
+bool isValidCivilianCell(
+	const CellType cell
+	)
+{
+	return cell == eFloor || cell == eCivilian;
 }
 
 inline
@@ -95,7 +107,7 @@ bool isValidPlayerCell(
 	const CellType cell
 	)
 {
-	return cell == eFloor || cell == eStairsDown || cell == eStairsUp || cell == eOpenDoor || cell == eCivilian;
+	return isValidCivilianCell(cell) || cell == eStairsDown || cell == eStairsUp || cell == eOpenDoor;
 }
 
 inline
@@ -119,7 +131,7 @@ float calculateCellDanger(
 	const Cell& cell
 	)
 {
-	return isValidPlayerCell(cell.type) == false ? 99.0f
+	return isValidCivilianCell(cell.type) == false ? 99.0f
 		: cell.fire > 0.0f ? 99.0f
 		: utils::max(cell.heat, (cell.water <= 0.4 ? 0.0f : cell.water));
 }
@@ -143,6 +155,13 @@ toweringinferno::World::ActionSuccess toweringinferno::World::calculateNewPlayer
 	const Position& playerPos
 	)
 {
+	if (isMovementKey(movementDir) == false)
+	{
+		return eAction_InvalidInput;
+	}
+
+	m_floorData.lastMovementDir = movementDir;
+
 	const Position idealNewPosition = calculateIdealNewPlayerPosition(playerPos, movementDir);
 	const CellType newPositionType = getType(idealNewPosition);
 	if (isValidPlayerCell(newPositionType))
@@ -152,7 +171,7 @@ toweringinferno::World::ActionSuccess toweringinferno::World::calculateNewPlayer
 	}
 	else
 	{
-		return eAction_InvalidInput;
+		return eAction_Failed;
 	}
 }
 
@@ -182,15 +201,12 @@ toweringinferno::WorldEvents toweringinferno::World::update(
 		return eEvent_InvalidInput;
 	}
 
-	if (calculateNewPlayerPos(command.vk, m_player.getPos()) == eAction_InvalidInput)
+	if (calculateNewPlayerPos(command.vk, m_player.getPos()) == eAction_Failed)
 	{
 		return eEvent_InvalidInput;
 	}
 
-	++m_floorData.turnCount;
 	m_player.update(*this);
-
-	m_floorData.lastMovementDir = isMovementKey(command.vk) ? command.vk : m_floorData.lastMovementDir;
 	
 	updateDynamics();
 
@@ -217,7 +233,7 @@ toweringinferno::World::ActionSuccess toweringinferno::World::updateSprinklerCon
 	{
 		for(int row = playerPos.second - 1; row < playerPos.second + 2; ++row)
 		{
-			if ((col != playerPos.first && row != playerPos.second) || getType(col, row) != eSprinklerControl)
+			if (getType(col, row) != eSprinklerControl)
 			{
 				continue;
 			}
@@ -261,7 +277,7 @@ toweringinferno::World::ActionSuccess toweringinferno::World::updateHoseRelease(
 	{
 		for(int row = playerPos.second - 1; row < playerPos.second + 2; ++row)
 		{
-			if ((col != playerPos.first && row != playerPos.second) || getType(col, row) != eHose)
+			if (getType(col, row) != eHose)
 			{
 				continue;
 			}
@@ -302,7 +318,7 @@ toweringinferno::World::ActionSuccess toweringinferno::World::updateAxe(
 	{
 		for(int row = playerPos.second - 1; row < playerPos.second + 2; ++row)
 		{
-			if ((col != playerPos.first && row != playerPos.second) || isValidCoords(col, row) == false)
+			if ((col == playerPos.first && row == playerPos.second) || isValidCoords(col, row) == false)
 			{
 				continue;
 			}
@@ -324,9 +340,9 @@ toweringinferno::World::ActionSuccess toweringinferno::World::updateAxe(
 		if (wallToAxe->hp <= 0.0f)
 		{
 			wallToAxe->type = eFloor;
+			m_player.useAxe();
 		}
-		
-		m_player.useAxe();
+
 		return eAction_Succeeded;
 	}
 	else
@@ -350,7 +366,7 @@ toweringinferno::World::ActionSuccess toweringinferno::World::updateDoors(
 	{
 		for(int row = playerPos.second - 1; row < playerPos.second + 2; ++row)
 		{
-			if ((col != playerPos.first && row != playerPos.second) || isValidCoords(col, row) == false)
+			if (isValidCoords(col, row) == false)
 			{
 				continue;
 			}
@@ -471,8 +487,7 @@ void toweringinferno::World::updateDynamics()
 					if (cell.type == eCivilian)
 					{
 						const float dangerHere = calculateCellDanger(neighbour);
-						const bool isPlayerPos = Position(neighbourCol, neighbourRow) == m_player.getPos();
-						if ((dangerHere < dangerAtDesiredPosition || isPlayerPos)
+						if (dangerHere < dangerAtDesiredPosition
 							&& neighbour.type != eCivilian && neighbour.typeFlip != eCivilian)
 						{
 							desiredCivilianPosition = Position(neighbourCol, neighbourRow);
@@ -575,7 +590,6 @@ toweringinferno::World::FloorSpecificData::FloorSpecificData(
 	)
 	: map(w*h)
 	, isSprinklerAvailable(true)
-	, turnCount(0)
 	, lastMovementDir(TCODK_NONE)
 {
 }
