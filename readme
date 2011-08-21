@@ -1,3 +1,8 @@
 My entry for August 2011's Ludum Dare.
 A roguelike where you must evacuate a towering inferno, fighting fire and interacting with the environment.
 Written in C++ with libtcod
+
+--
+Linux 64bit version has a Makefile in the toweringinferno directory.  It also requires terminal.png which I've moved in there.  Either copy the libraries to your LD_LIBRARY_PATH or start the game with:
+
+LD_LIBRARY_PATH=$LD_LIBRARY_PATH:. ./toweringinferno
