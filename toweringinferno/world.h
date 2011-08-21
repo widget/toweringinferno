@@ -21,7 +21,7 @@ enum WorldEvents
 
 struct Cell
 {
-	Cell() : type(eSky), fire(0.0f), heat(0.0f), water(0.0f), waterFlip(0.0f), heatFlip(0.0f), hp(1.0f) {}
+	Cell() : type(eSky), fire(0.0f), heat(0.0f), water(0.0f), waterFlip(0.0f), heatFlip(0.0f), typeFlip(eSky), hp(1.0f) {}
 
 	CellType type;
 	float fire;
@@ -29,6 +29,7 @@ struct Cell
 	float water;
 	float waterFlip;
 	float heatFlip;
+	CellType typeFlip;
 	float hp;
 
 	void setFire(const float fireIn) { fire = heat = fireIn; }
@@ -82,7 +83,7 @@ private:
 	ActionSuccess updateHoseRelease(const TCOD_key_t& command);
 	ActionSuccess updateAxe(const TCOD_key_t& command);
 	void updateDynamics();
-	Position calculateNewPlayerPos(TCOD_keycode_t movementDir, const Position& playerPos)const;
+	ActionSuccess calculateNewPlayerPos(TCOD_keycode_t movementDir, const Position& playerPos);
 
 	inline int coordsToIndex(const Position& pos) const { return coordsToIndex(pos.first, pos.second); }
 	int coordsToIndex(int x, int y) const;
