@@ -24,7 +24,7 @@ bool isActionKey(
 	const TCOD_key_t& command
 	)
 {
-	return (command.vk == TCODK_CHAR && command.c == 'a' || command.c == 'A') || command.vk == TCODK_ENTER;
+	return ((command.vk == TCODK_CHAR) && (command.c == 'a') || (command.c == 'A')) || (command.vk == TCODK_ENTER);
 }
 
 bool isDoorToggleKey(
@@ -66,10 +66,10 @@ bool isDeltaWithDirection(
 	const TCOD_keycode_t direction
 	)
 {
-	return deltaX < 0 && direction == TCODK_LEFT
-		|| deltaX > 0 && direction == TCODK_RIGHT
-		|| deltaY < 0 && direction == TCODK_UP
-		|| deltaY > 0 && direction == TCODK_DOWN;
+	return deltaX < 0 && (direction == TCODK_LEFT)
+		|| deltaX > 0 && (direction == TCODK_RIGHT)
+		|| deltaY < 0 && (direction == TCODK_UP)
+		|| deltaY > 0 && (direction == TCODK_DOWN);
 }
 
 inline

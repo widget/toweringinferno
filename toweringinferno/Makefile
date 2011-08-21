@@ -4,7 +4,7 @@ CXXFLAGS := -I ../libtcod-1.5.0/include -std=c++0x -Wall
 
 
 toweringinferno: game.o world.o main.o proceduralgeneration/floorgenerator.o player.o
-	$(CXX) $^ -o toweringinferno -ltcodxx -ltcod -ltcodgui -L.
+	$(CXX) $^ -o toweringinferno -ltcodxx -ltcod -ltcodgui -L../libtcod-1.5.0
 
 clean:
 	rm -f *.o toweringinferno
