@@ -136,6 +136,7 @@ enum DebugRenderMode
 
 void debugRender(
 	const World& world,
+	const int highScore,
 	const DebugRenderMode renderMode
 	)
 {
@@ -180,13 +181,15 @@ void debugRender(
 	}
 	else
 	{
-		hud << "HP: " << static_cast<int>(world.getPlayer().getHealth()*100) << " Bombs remaining: " 
-			<< world.getPlayer().getBombsRemaining() << " Civilians rescued: " << world.getPlayer().getCiviliansRescued();
+		hud << "Health:" << static_cast<int>(world.getPlayer().getHealth()*100) << " (B)ombs remaining:" 
+			<< world.getPlayer().getBombsRemaining() << " (A)xe strength:" << world.getPlayer().getAxesRemaining() 
+			<< " Civilians rescued:" << world.getPlayer().getCiviliansRescued();
 	}
 	TCODConsole::root->printCenter(world.getWidth()/2, world.getHeight() - 2, TCOD_BKGND_NONE, hud.str().c_str());
 
 	std::stringstream score;
-	score << "Floors escaped: " << world.getFloorsEscaped() << " Score: " << world.getPlayer().getScore();
+	score << "Floors escaped:" << world.getFloorsEscaped() << " Score:" << world.getPlayer().getScore() 
+		<< " High score:" << highScore;
 	TCODConsole::root->printCenter(world.getWidth()/2, world.getHeight() - 1, TCOD_BKGND_NONE, score.str().c_str());
 
 	// titles
@@ -203,6 +206,10 @@ void debugRender(
 		"Fire hoses 'H' can be turned on to flood small areas.",
 		"Closed doors will slow down the fire but also block water",
 		"If you're trapped, 'x' will use your axe on the nearest wall",
+		"Water bombs work well through a constriction or a doorway",
+		"Saving civilians gets you health and bomb bonuses on completing a floor",
+		"Water bombs are most effective a few squares away from fire.",
+		"If you put water bombs right next to fire, they evaporate too quickly",
 	};
 	static const int motdCount = sizeof(motd)/sizeof(char*);
 
@@ -229,6 +236,7 @@ void toweringinferno::executeGameLoop()
 	RenderMode renderMode = eRender_Normal;
 	DebugRenderMode debugRenderMode = eDebugRender_None;
 
+	int highestScore = 0;
 	World world(width, height);
 	
 	while ( TCODConsole::isWindowClosed() == false ) 
@@ -264,7 +272,7 @@ void toweringinferno::executeGameLoop()
 
 		TCODConsole::root->clear();
 		renderWorld(world, renderMode);
-		debugRender(world, debugRenderMode);
+		debugRender(world, highestScore, debugRenderMode);
 		TCODConsole::flush();
 
 		const TCOD_key_t key=TCODConsole::checkForKeypress();
@@ -290,6 +298,10 @@ void toweringinferno::executeGameLoop()
 		{
 			newGamePlease = true;
 		}
+		
+		newFloorPlease = newFloorPlease || (debugRenderMode != eDebugRender_None && key.c == 'w');
+
+		highestScore = utils::max(highestScore, world.getPlayer().getScore());
 		
 	}
 }
