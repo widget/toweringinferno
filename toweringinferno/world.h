@@ -39,6 +39,8 @@ class World
 public:
 	World(int w, int h);
 
+	void resetForNewFloor();
+
 	WorldEvents update(const TCOD_key_t& command);
 
 	CellType getType(const Position& pos)const { return getType(pos.first, pos.second); }
@@ -59,9 +61,12 @@ public:
 	const Player& getPlayer() const { return m_player; }
 	Player& getPlayer() { return m_player; }
 
-	bool isSprinklerSystemAvailable() const { return m_sprinkerAvailable; }
+	bool isSprinklerSystemAvailable() const { return m_floorData.isSprinklerAvailable; }
 
-	int getTurnCount() const { return m_turnCount; }
+	int getTurnCount() const { return m_floorData.turnCount; }
+	void resetTurnCount() { m_floorData.turnCount = 0; }
+
+	int getFloorsEscaped() const { return m_floorsEscaped; }
 
 private:
 	
@@ -75,18 +80,28 @@ private:
 	ActionSuccess updateDoors(const TCOD_key_t& command);
 	ActionSuccess updateSprinklerControl(const TCOD_key_t& command);
 	ActionSuccess updateHoseRelease(const TCOD_key_t& command);
+	ActionSuccess updateAxe(const TCOD_key_t& command);
 	void updateDynamics();
 	Position calculateNewPlayerPos(TCOD_keycode_t movementDir, const Position& playerPos)const;
 
 	inline int coordsToIndex(const Position& pos) const { return coordsToIndex(pos.first, pos.second); }
 	int coordsToIndex(int x, int y) const;
 
-	std::vector<Cell> m_map;
+	struct FloorSpecificData
+	{
+		FloorSpecificData(int w, int h);
+
+		std::vector<Cell> map;
+		bool isSprinklerAvailable;
+		int turnCount;
+		TCOD_keycode_t lastMovementDir;
+	};
+
 	int m_width;
 	int m_height;
 	Player m_player;
-	bool m_sprinkerAvailable;
-	int m_turnCount;
+	FloorSpecificData m_floorData;
+	int m_floorsEscaped;
 }; 
 
 } // namespace toweringinferno
@@ -100,7 +115,7 @@ int toweringinferno::World::coordsToIndex(
 	assert(x >= 0 && x < m_width);
 	assert(y >= 0 && y < m_height);
 	const int index = y * m_width + x;
-	assert(index < static_cast<int>(m_map.size()));
+	assert(index < static_cast<int>(m_floorData.map.size()));
 	return index;
 }
 
@@ -110,7 +125,7 @@ const toweringinferno::Cell& toweringinferno::World::getCell(
 	const int y
 	) const
 {
-	return m_map[coordsToIndex(x,y)];
+	return m_floorData.map[coordsToIndex(x,y)];
 }
 
 inline
@@ -120,7 +135,7 @@ void toweringinferno::World::set(
 	const CellType newType
 	)
 {
-	m_map[coordsToIndex(x,y)].type = newType;
+	m_floorData.map[coordsToIndex(x,y)].type = newType;
 }
 
 inline
@@ -128,7 +143,7 @@ void toweringinferno::World::setWaterBomb(
 	const Position& pos
 	)
 {
-	m_map[coordsToIndex(pos.first,pos.second)].water = 1.5f;
+	m_floorData.map[coordsToIndex(pos.first,pos.second)].water = 1.5f;
 }
 
 inline
@@ -137,7 +152,7 @@ void toweringinferno::World::setHose(
 	const int y
 	)
 {
-	Cell& cell = m_map[coordsToIndex(x,y)];
+	Cell& cell = m_floorData.map[coordsToIndex(x,y)];
 	cell.type = eHose;
 	cell.water = 0.0f;
 }
@@ -149,7 +164,7 @@ void toweringinferno::World::setFire(
 	const float newFire
 	)
 {
-	Cell& cell = m_map[coordsToIndex(x,y)];
+	Cell& cell = m_floorData.map[coordsToIndex(x,y)];
 	cell.fire = newFire;
 	cell.heat = 1.0f;
 }
@@ -162,7 +177,7 @@ toweringinferno::CellType toweringinferno::World::getType(
 {
 	return x < 0 || x >= m_width ? eSky
 		: y < 0 || y >= m_height ? eSky
-		: m_map[coordsToIndex(x,y)].type;
+		: m_floorData.map[coordsToIndex(x,y)].type;
 }
 
 #endif // __TI_WORLD_H_

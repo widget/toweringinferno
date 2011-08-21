@@ -73,7 +73,9 @@ void renderWorld(
 			}
 
 			const TCODColor baseBgCol 
-				= cell.type == eWall ? TCODColor::darkGrey
+				= cell.type == eWall 
+					? TCODColor::lerp(TCODColor::lightGrey, TCODColor::darkGrey, 
+						utils::mapValue(cell.hp, 0.0f, 1.0f, 0.5f, 1.0f))
 				: cell.type == eClosedDoor ? closedDoor
 				: cell.type == eSprinklerControl ? 
 					(world.isSprinklerSystemAvailable() ? TCODColor::yellow : TCODColor::darkerYellow)
@@ -184,7 +186,7 @@ void debugRender(
 	TCODConsole::root->printCenter(world.getWidth()/2, world.getHeight() - 2, TCOD_BKGND_NONE, hud.str().c_str());
 
 	std::stringstream score;
-	score << "Score: " << world.getPlayer().getScore();
+	score << "Floors escaped: " << world.getFloorsEscaped() << " Score: " << world.getPlayer().getScore();
 	TCODConsole::root->printCenter(world.getWidth()/2, world.getHeight() - 1, TCOD_BKGND_NONE, score.str().c_str());
 
 	// titles
@@ -200,6 +202,7 @@ void debugRender(
 		"The sprinkler control panel 'S' will help control the fire.",
 		"Fire hoses 'H' can be turned on to flood small areas.",
 		"Closed doors will slow down the fire but also block water",
+		"If you're trapped, 'x' will use your axe on the nearest wall",
 	};
 	static const int motdCount = sizeof(motd)/sizeof(char*);
 
@@ -221,8 +224,8 @@ void toweringinferno::executeGameLoop()
 	TCODConsole::root->setForegroundColor(TCODColor::darkerGrey);
 	TCODSystem::setFps(25);
 
-	bool newGamePlease = false;
-	bool newFloorPlease = true;
+	bool newGamePlease = true;
+	bool newFloorPlease = false;
 	RenderMode renderMode = eRender_Normal;
 	DebugRenderMode debugRenderMode = eDebugRender_None;
 
@@ -232,7 +235,14 @@ void toweringinferno::executeGameLoop()
 	{
 		if (newFloorPlease || newGamePlease)
 		{
-			world = World(width,height);
+			if (newGamePlease)
+			{
+				world = World(width,height);
+			}
+			else
+			{
+				world.resetForNewFloor();
+			}
 
 			const int hbuffer = 2;
 			const int vbuffer = 3;
@@ -243,6 +253,13 @@ void toweringinferno::executeGameLoop()
 			pushFloorToMap(floor, world);
 			newFloorPlease = false;
 			newGamePlease = false;
+
+			for(int updateSetup = 0; updateSetup < 3; ++updateSetup)
+			{
+				TCOD_key_t space = { TCODK_SPACE };
+				world.update(space);
+			}
+			world.resetTurnCount();
 		}
 
 		TCODConsole::root->clear();
