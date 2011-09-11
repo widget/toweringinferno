@@ -16,6 +16,12 @@
     <Filter Include="Source Files\proceduralgeneration">
       <UniqueIdentifier>{bcc0758f-8077-4145-8201-8153be74d060}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Source Files\heatvision">
+      <UniqueIdentifier>{bd32e538-3926-42f5-bafb-46656de25376}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\utils">
+      <UniqueIdentifier>{5a81702c-0696-46ff-b11e-84b794c69254}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="main.cpp">
@@ -33,6 +39,9 @@
     <ClCompile Include="player.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="heatvision\heatvisionsystem.cpp">
+      <Filter>Source Files\heatvision</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="game.h">
@@ -44,9 +53,6 @@
     <ClInclude Include="world.h">
       <Filter>Source Files</Filter>
     </ClInclude>
-    <ClInclude Include="utils.h">
-      <Filter>Source Files</Filter>
-    </ClInclude>
     <ClInclude Include="celltype.h">
       <Filter>Source Files</Filter>
     </ClInclude>
@@ -55,6 +61,15 @@
     </ClInclude>
     <ClInclude Include="player.h">
       <Filter>Source Files</Filter>
+    </ClInclude>
+    <ClInclude Include="heatvision\heatvisionsystem.h">
+      <Filter>Source Files\heatvision</Filter>
+    </ClInclude>
+    <ClInclude Include="utils\intersections.h">
+      <Filter>Source Files\utils</Filter>
+    </ClInclude>
+    <ClInclude Include="utils\utils.h">
+      <Filter>Source Files\utils</Filter>
     </ClInclude>
   </ItemGroup>
 </Project>

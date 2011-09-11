@@ -1,7 +1,7 @@
 #include <math.h>
 #include "player.h"
 #include "world.h"
-#include "utils.h"
+#include "utils/utils.h"
 
 namespace toweringinferno
 {
@@ -42,9 +42,6 @@ void toweringinferno::Player::update(
 	)
 {
 	m_health = utils::max(m_health - calculateDamage(world.getCell(m_pos)), 0.0f);
-
-	const int civiliansRescuedThisTurn = world.rescueCivilian(m_pos) ? 1 : 0;
-	m_levelData.civiliansRescued += civiliansRescuedThisTurn;
 }
 
 void toweringinferno::Player::useWaterBomb(

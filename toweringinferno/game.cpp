@@ -1,10 +1,13 @@
 #include <string>
 #include <sstream>
+#include <climits>
+#include <algorithm>
 #include "libtcod.hpp"
 #include "game.h"
 #include "world.h"
 #include "proceduralgeneration/floorgenerator.h"
-#include "utils.h"
+#include "utils/utils.h"
+#include "heatvision/heatvisionsystem.h"
 
 namespace toweringinferno
 {
@@ -31,12 +34,26 @@ void pushFloorToMap(
 
 	for(auto firePos = floor.getInitialFires().begin(); firePos != floor.getInitialFires().end(); ++firePos)
 	{
-		world.setFire(firePos->first, firePos->second, 1.0f);
+		world.setFire(firePos->col, firePos->row, 1.0f);
 	}
 
 	for(auto hosePos = floor.getHoses().begin(); hosePos != floor.getHoses().end(); ++hosePos)
 	{
-		world.setHose(hosePos->first, hosePos->second);
+		world.setHose(hosePos->col, hosePos->row);
+	}
+}
+
+void pushFloorToHeatvision(
+	const proceduralgeneration::FloorGenerator& floor,
+	heatvision::HeatvisionSystem& heatvision
+	)
+{
+	heatvision = heatvision::HeatvisionSystem();
+	for(auto civilianPosIt = floor.getCivilians().begin()
+		; civilianPosIt != floor.getCivilians().end()
+		; ++civilianPosIt)
+	{
+		heatvision.addCivilian(*civilianPosIt);
 	}
 }
 
@@ -49,7 +66,9 @@ enum RenderMode
 
 void renderWorld(
 	const World& world,
-	const RenderMode renderMode
+	const heatvision::HeatvisionSystem& heatvision,
+	const RenderMode renderMode,
+	const int levelSeed
 	)
 {
 	static const TCODColor fire(255,0,0);
@@ -59,7 +78,7 @@ void renderWorld(
 
 	const TCODColor& renderTargetColor = renderMode == eRender_Heat ? heat : fire;
 
-	TCODRandom floorRng(0);
+	TCODRandom floorRng(levelSeed);
 
 	for(int x = 0; x < world.getWidth(); ++x)
 	{
@@ -72,6 +91,12 @@ void renderWorld(
 				continue;
 			}
 
+			const TCODColor floorCol = 
+				x % 2 == y % 2
+					? TCODColor::lerp(TCODColor::lightGrey, TCODColor::darkGrey, 
+						floorRng.getGaussianFloat(0.0f, 0.25f))
+				: TCODColor::lightGrey;
+
 			const TCODColor baseBgCol 
 				= cell.type == eWall 
 					? TCODColor::lerp(TCODColor::lightGrey, TCODColor::darkGrey, 
@@ -79,10 +104,7 @@ void renderWorld(
 				: cell.type == eClosedDoor ? closedDoor
 				: cell.type == eSprinklerControl ? 
 					(world.isSprinklerSystemAvailable() ? TCODColor::yellow : TCODColor::darkerYellow)
-				: x % 2 == y % 2
-					? TCODColor::lerp(TCODColor::lightGrey, TCODColor::darkGrey, 
-						floorRng.getGaussianFloat(0.0f, 0.25f))
-				: TCODColor::lightGrey;
+				: floorCol;
 
 			const float renderTarget = renderMode == eRender_Normal ? cell.fire : cell.heat;
 			const TCODColor heatBgCol = TCODColor::lerp(baseBgCol, renderTargetColor, 
@@ -97,7 +119,7 @@ void renderWorld(
 				? heatBgCol
 				: waterBgCol;
 			
-			const bool isPlayer = x == world.getPlayer().getPos().first && y == world.getPlayer().getPos().second;
+			const bool isPlayer = x == world.getPlayer().getPos().col && y == world.getPlayer().getPos().row;
 
 			const int c
 				= isPlayer ? '@'
@@ -108,7 +130,6 @@ void renderWorld(
 				: cell.type == eClosedDoor ? '+'
 				: cell.type == eOpenDoor ? '-'
 				: cell.type == eSprinklerControl ? 'S'
-				: cell.type == eCivilian ? 'd'
 				: ' ';
 
 			const float playerHealth = world.getPlayer().getHealth();
@@ -117,13 +138,20 @@ void renderWorld(
 					? TCODColor::lerp(TCODColor::pink, TCODColor::desaturatedOrange, utils::mapValue(playerHealth, 0.0f, 0.2f, 0.0f, 1.0f))
 					: TCODColor::lerp(TCODColor::desaturatedOrange, TCODColor::orange, utils::mapValue(playerHealth, 0.2f, 1.0f, 0.0f, 1.0f))
 					)
-				: cell.type == eCivilian ? TCODColor::darkViolet
 				: cell.type == eHose && cell.hp > 0.0f ? TCODColor::blue
 				: cell.type == eStairsDown ? TCODColor::darkGreen
 				: TCODColor::black;
 
 			TCODConsole::root->putCharEx(x, y, c, fgColor, bgCol);
 		}
+	}
+
+	const TCODColor civilianColour = TCODColor::darkViolet;
+	for(auto civilian = heatvision.getCivilians().begin(); civilian != heatvision.getCivilians().end(); ++civilian)
+	{
+		const TCODColor backgroundCol = TCODConsole::root->getBack(civilian->pos.col, civilian->pos.row);
+		TCODConsole::root->putCharEx(civilian->pos.col, civilian->pos.row, 
+			'd', civilianColour, backgroundCol);
 	}
 }
 
@@ -136,9 +164,11 @@ enum DebugRenderMode
 
 void debugRender(
 	const World& world,
+	const heatvision::HeatvisionSystem& heatvision,
 	const int highScore,
 	const int turnCount,
-	const DebugRenderMode renderMode
+	const DebugRenderMode renderMode,
+	const int levelSeed
 	)
 {
 	// hud
@@ -151,7 +181,7 @@ void debugRender(
 	else
 	{
 		hud << "Health:" << static_cast<int>(world.getPlayer().getHealth()*100) << " (B)ombs remaining:" 
-			<< world.getPlayer().getBombsRemaining() << " (A)xe strength:" << world.getPlayer().getAxesRemaining() 
+			<< world.getPlayer().getBombsRemaining() << " A(x)e strength:" << world.getPlayer().getAxesRemaining() 
 			<< " Civilians rescued:" << world.getPlayer().getCiviliansRescued();
 	}
 	TCODConsole::root->printCenter(world.getWidth()/2, world.getHeight() - 2, TCOD_BKGND_NONE, hud.str().c_str());
@@ -160,8 +190,7 @@ void debugRender(
 	score << "Turns:" << turnCount << " Floors escaped:" << world.getFloorsEscaped() << " Score:" << world.getPlayer().getScore() 
 		<< " High score:" << highScore;
 	TCODConsole::root->printCenter(world.getWidth()/2, world.getHeight() - 1, TCOD_BKGND_NONE, score.str().c_str());
-
-
+	
 	const int mouseX = TCODMouse::getStatus().cx;
 	const int mouseY = TCODMouse::getStatus().cy;
 
@@ -175,17 +204,31 @@ void debugRender(
 			waterText << "(" << mouseX << "," << mouseY << ") w:" << currentMouseCell.water << " h:" 
 				<< currentMouseCell.heat << " f:" << currentMouseCell.fire << " hp: " << currentMouseCell.hp << " ";
 			TCODConsole::root->printLeft(0, world.getHeight() - 1, TCOD_BKGND_NONE, waterText.str().c_str());
+
+			const heatvision::HeatvisionSystem::CivilianList& civilians = heatvision.getCivilians();
+			const heatvision::HeatvisionSystem::CivilianList::const_iterator civilianAtMouse
+				= std::find(civilians.begin(), civilians.end(), Point(mouseX, mouseY));
+
+			if (civilianAtMouse != civilians.end())
+			{
+				for(int tileIndex = 0; tileIndex < heatvision::eTile_Count; ++tileIndex)
+				{
+					const heatvision::TileHeat& heatAtTile = civilianAtMouse->heatMap[tileIndex];
+					TCODConsole::root->setBack(heatAtTile.pos.col, heatAtTile.pos.row,
+						TCODColor::lerp(TCODColor(0,0,0), TCODColor::red, heatAtTile.danger));
+				}
+			}
 		}
 
 		const char* const tooltip 
-			= mouseX == world.getPlayer().getPos().first && mouseY == world.getPlayer().getPos().second
+			= mouseX == world.getPlayer().getPos().col && mouseY == world.getPlayer().getPos().row
 				? "The player"
 			: currentMouseCell.type == eOpenDoor || currentMouseCell.type == eClosedDoor 
 				? "Close doors with action. Closed doors slow fire and block water."
 			: currentMouseCell.type == eHose ? "Open hoses with action. Completely floods nearby rooms."
 			: currentMouseCell.type == eSprinklerControl ? "Trigger sprinklers with action. Partially floods whole floor."
 			: currentMouseCell.type == eStairsDown ? "Step onto stairs down to escape floor"
-			: currentMouseCell.type == eCivilian ? "Walk over civilians to rescue them before they burn or drown."
+			//: currentMouseCell.type == eCivilian ? "Walk over civilians to rescue them before they burn or drown."
 			: currentMouseCell.water > 0.4f ? "Water quenches fire"
 			: currentMouseCell.fire > 0.0f ? "Fire will hurt you a lot"
 			: currentMouseCell.heat > 0.25f ? "Hot areas around fire will hurt you a litle"
@@ -197,7 +240,15 @@ void debugRender(
 	
 	// titles
 
-	TCODConsole::root->printCenter(world.getWidth()/2,0,TCOD_BKGND_NONE,"THE TOWERING INFERNO");
+	std::stringstream titles;
+	titles << "THE TOWERING INFERNO";
+
+	if (renderMode == eDebugRender_Cell)
+	{
+		titles << " seed:" << levelSeed;
+	}
+
+	TCODConsole::root->printCenter(world.getWidth()/2,0,TCOD_BKGND_NONE,titles.str().c_str());
 	TCODConsole::root->printCenter(world.getWidth()/2,1,TCOD_BKGND_NONE,"Get to the stairs down '>' to escape the floor.");
 
 	static const char* const motd[] = {
@@ -222,6 +273,17 @@ void debugRender(
 	TCODConsole::root->printCenter(world.getWidth()/2,2,TCOD_BKGND_NONE,helpMessage);
 }
 
+void removeCivilians(
+	Player& player,
+	heatvision::HeatvisionSystem& heatVision
+	)
+{
+	if (heatVision.tryRemoveCivilian(player.getPos()))
+	{
+		player.rescueCivilian();
+	}
+}
+
 } // namespace toweringinferno
 
 void toweringinferno::executeGameLoop()
@@ -242,6 +304,9 @@ void toweringinferno::executeGameLoop()
 	int highestScore = 0;
 	int turnCount = 0;
 	World world(width, height);
+	heatvision::HeatvisionSystem heatvision;
+	int levelSeed = 0;
+	Point lastExitPosition(-1,-1);
 	
 	while ( TCODConsole::isWindowClosed() == false ) 
 	{
@@ -257,14 +322,19 @@ void toweringinferno::executeGameLoop()
 				world.resetForNewFloor();
 			}
 
+			levelSeed = TCODRandom::getInstance()->getInt(0, INT_MAX);
 			const int hbuffer = 2;
 			const int vbuffer = 3;
 			const proceduralgeneration::FloorGenerator floor(
+				levelSeed,
 				hbuffer, vbuffer,
 				width - hbuffer*2, height - vbuffer*2,
-				world.getFloorsEscaped());
+				world.getFloorsEscaped(),
+				lastExitPosition);
+			lastExitPosition = floor.getExitPosition();
 
 			pushFloorToMap(floor, world);
+			pushFloorToHeatvision(floor, heatvision);
 			newFloorPlease = false;
 			newGamePlease = false;
 
@@ -272,21 +342,26 @@ void toweringinferno::executeGameLoop()
 			{
 				TCOD_key_t space = { TCODK_SPACE };
 				world.update(space);
+				heatvision.update(world);
 			}
 		}
 
 		TCODConsole::root->clear();
-		renderWorld(world, renderMode);
-		debugRender(world, highestScore, turnCount, debugRenderMode);
+		renderWorld(world, heatvision, renderMode, levelSeed);
+		debugRender(world, heatvision, highestScore, turnCount, debugRenderMode, levelSeed);
 		TCODConsole::flush();
 
 		const TCOD_key_t key=TCODConsole::checkForKeypress();
 		const WorldEvents ev = world.update(key);
-
+		
 		turnCount += (ev == eEvent_InvalidInput || ev == eEvent_PlayerDied) ? 0 : 1;
 
 		if (ev != eEvent_InvalidInput)
 		{
+			heatvision.preUpdate();
+			removeCivilians(world.getPlayer(), heatvision);
+			heatvision.update(world);
+
 			newFloorPlease = ev == eEvent_NextFloorDown;
 			newGamePlease = key.vk == TCODK_SPACE && ev == eEvent_PlayerDied;
 		}	

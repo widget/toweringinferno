@@ -3,7 +3,7 @@ CXXFLAGS := -I ../libtcod-1.5.0/include -std=c++0x -Wall
 	$(CXX)  $(CXXFLAGS) -c $<
 
 
-toweringinferno: game.o world.o main.o proceduralgeneration/floorgenerator.o player.o
+toweringinferno: game.o world.o main.o proceduralgeneration/floorgenerator.o player.o heatvision/heatvisionsystem.o
 	$(CXX) $^ -o toweringinferno -ltcodxx -ltcod -ltcodgui -L../libtcod-1.5.0
 
 clean:

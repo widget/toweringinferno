@@ -1,6 +1,6 @@
 #include <array>
 #include "world.h"
-#include "utils.h"
+#include "utils/utils.h"
 
 
 namespace toweringinferno
@@ -38,8 +38,8 @@ bool isDoorToggleKey(
 			&& (command.c == '=' || command.c == '+' || command.c == 'c' || command.c == 'C'));
 }
 
-Position calculateIdealNewPlayerPosition(
-	const Position& current,
+Point calculateIdealNewPlayerPosition(
+	const Point& current,
 	const TCOD_keycode_t movementDir
 	)
 {
@@ -47,31 +47,31 @@ Position calculateIdealNewPlayerPosition(
 	{
 	case TCODK_LEFT:
 	case TCODK_KP4:
-		return Position(current.first - 1, current.second);
+		return Point(current.col - 1, current.row);
 
 	case TCODK_RIGHT:
 	case TCODK_KP6:
-		return Position(current.first + 1, current.second);
+		return Point(current.col + 1, current.row);
 
 	case TCODK_UP:
 	case TCODK_KP8:
-		return Position(current.first, current.second - 1);
+		return Point(current.col, current.row - 1);
 
 	case TCODK_DOWN:
 	case TCODK_KP2:
-		return Position(current.first, current.second + 1);
+		return Point(current.col, current.row + 1);
 
 	case TCODK_KP7:
-		return Position(current.first-1, current.second-1);
+		return Point(current.col-1, current.row-1);
 
 	case TCODK_KP9:
-		return Position(current.first+1, current.second-1);
+		return Point(current.col+1, current.row-1);
 
 	case TCODK_KP1:
-		return Position(current.first-1, current.second+1);
+		return Point(current.col-1, current.row+1);
 
 	case TCODK_KP3:
-		return Position(current.first+1, current.second+1);
+		return Point(current.col+1, current.row+1);
 
 	default:
 		return current;
@@ -94,20 +94,12 @@ bool isDeltaWithDirection(
 		|| deltaX > 0 && deltaY > 0 && direction == TCODK_KP3;
 }
 
-inline 
-bool isValidCivilianCell(
-	const CellType cell
-	)
-{
-	return cell == eFloor || cell == eCivilian;
-}
-
 inline
 bool isValidPlayerCell(
 	const CellType cell
 	)
 {
-	return isValidCivilianCell(cell) || cell == eStairsDown || cell == eStairsUp || cell == eOpenDoor;
+	return cell == eFloor || cell == eStairsDown || cell == eStairsUp || cell == eOpenDoor;
 }
 
 inline
@@ -126,16 +118,6 @@ bool isWaterBlocker(
 	return cell == eSky || cell == eWall || cell == eClosedDoor || cell == eSprinklerControl;
 }
 
-inline
-float calculateCellDanger(
-	const Cell& cell
-	)
-{
-	return isValidCivilianCell(cell.type) == false ? 99.0f
-		: cell.fire > 0.0f ? 99.0f
-		: utils::max(cell.heat, (cell.water <= 0.4 ? 0.0f : cell.water));
-}
-
 } // namespace toweringinferno
 
 toweringinferno::World::World(
@@ -152,7 +134,7 @@ toweringinferno::World::World(
 
 toweringinferno::World::ActionSuccess toweringinferno::World::calculateNewPlayerPos(
 	const TCOD_keycode_t movementDir, 
-	const Position& playerPos
+	const Point& playerPos
 	)
 {
 	if (isMovementKey(movementDir) == false)
@@ -162,7 +144,7 @@ toweringinferno::World::ActionSuccess toweringinferno::World::calculateNewPlayer
 
 	m_floorData.lastMovementDir = movementDir;
 
-	const Position idealNewPosition = calculateIdealNewPlayerPosition(playerPos, movementDir);
+	const Point idealNewPosition = calculateIdealNewPlayerPosition(playerPos, movementDir);
 	const CellType newPositionType = getType(idealNewPosition);
 	if (isValidPlayerCell(newPositionType))
 	{
@@ -228,10 +210,10 @@ toweringinferno::World::ActionSuccess toweringinferno::World::updateSprinklerCon
 		return eAction_Failed;
 	}
 
-	const Position playerPos = m_player.getPos();
-	for(int col = playerPos.first - 1; col < playerPos.first + 2; ++col)
+	const Point playerPos = m_player.getPos();
+	for(int col = playerPos.col - 1; col < playerPos.col + 2; ++col)
 	{
-		for(int row = playerPos.second - 1; row < playerPos.second + 2; ++row)
+		for(int row = playerPos.row - 1; row < playerPos.row + 2; ++row)
 		{
 			if (getType(col, row) != eSprinklerControl)
 			{
@@ -272,10 +254,10 @@ toweringinferno::World::ActionSuccess toweringinferno::World::updateHoseRelease(
 		return eAction_InvalidInput;
 	}
 
-	const Position playerPos = m_player.getPos();
-	for(int col = playerPos.first - 1; col < playerPos.first + 2; ++col)
+	const Point playerPos = m_player.getPos();
+	for(int col = playerPos.col - 1; col < playerPos.col + 2; ++col)
 	{
-		for(int row = playerPos.second - 1; row < playerPos.second + 2; ++row)
+		for(int row = playerPos.row - 1; row < playerPos.row + 2; ++row)
 		{
 			if (getType(col, row) != eHose)
 			{
@@ -313,12 +295,12 @@ toweringinferno::World::ActionSuccess toweringinferno::World::updateAxe(
 
 	Cell* wallToAxe = NULL;
 
-	const Position playerPos = m_player.getPos();
-	for(int col = playerPos.first - 1; col < playerPos.first + 2; ++col)
+	const Point playerPos = m_player.getPos();
+	for(int col = playerPos.col - 1; col < playerPos.col + 2; ++col)
 	{
-		for(int row = playerPos.second - 1; row < playerPos.second + 2; ++row)
+		for(int row = playerPos.row - 1; row < playerPos.row + 2; ++row)
 		{
-			if ((col == playerPos.first && row == playerPos.second) || isValidCoords(col, row) == false)
+			if ((col == playerPos.col && row == playerPos.row) || isValidCoords(col, row) == false)
 			{
 				continue;
 			}
@@ -327,7 +309,7 @@ toweringinferno::World::ActionSuccess toweringinferno::World::updateAxe(
 
 			if (axisNeighbourCell.type == eWall 
 				&& (wallToAxe == NULL 
-					|| isDeltaWithDirection(col - playerPos.first, row - playerPos.second, m_floorData.lastMovementDir)))
+					|| isDeltaWithDirection(col - playerPos.col, row - playerPos.row, m_floorData.lastMovementDir)))
 			{
 				wallToAxe = &axisNeighbourCell;
 			}
@@ -361,10 +343,10 @@ toweringinferno::World::ActionSuccess toweringinferno::World::updateDoors(
 	}
 
 	bool didAnyDoorFlip = false;
-	const Position playerPos = m_player.getPos();
-	for(int col = playerPos.first - 1; col < playerPos.first + 2; ++col)
+	const Point playerPos = m_player.getPos();
+	for(int col = playerPos.col - 1; col < playerPos.col + 2; ++col)
 	{
-		for(int row = playerPos.second - 1; row < playerPos.second + 2; ++row)
+		for(int row = playerPos.row - 1; row < playerPos.row + 2; ++row)
 		{
 			if (isValidCoords(col, row) == false)
 			{
@@ -410,20 +392,6 @@ void toweringinferno::World::updateDynamics()
 				continue;
 			}
 
-			if (cell.type == eCivilian)
-			{
-				const float hpDelta 
-					= cell.fire > 0.0f ? utils::mapValue(cell.fire, 0.0f, 0.5f, 0.0f, -0.4f)
-					: cell.water > 0.0f ? utils::mapValue(cell.water, 0.85f, 1.5f, 0.0f, -0.4f)
-					: 0.0f;
-				cell.hp = utils::max(0.0f, cell.hp + hpDelta);
-				if (cell.hp <= 0.0f)
-				{
-					// they died!
-					cell.typeFlip = eFloor;
-				}
-			}
-
 			// calculate heat
 			float heat = 0.0f;
 				
@@ -434,10 +402,7 @@ void toweringinferno::World::updateDynamics()
 
 			float condensationScore = cell.water;
 			int condensationContributors = 1;
-
-			Position desiredCivilianPosition(col,row);
-			float dangerAtDesiredPosition = calculateCellDanger(cell);
-
+			
  			for(int neighbourCol = utils::max(col - 1, 0); 
 				neighbourCol < utils::min(getWidth(), col + 2);
 				++neighbourCol)
@@ -483,16 +448,6 @@ void toweringinferno::World::updateDynamics()
 						&& cell.water < neighbour.water;
 					waterTotal += (isNeighbourContributingWater ? neighbour.water : 0.0f);
 					waterContributors += isNeighbourContributingWater ? 1 : 0;
-
-					if (cell.type == eCivilian)
-					{
-						const float dangerHere = calculateCellDanger(neighbour);
-						if (dangerHere < dangerAtDesiredPosition
-							&& neighbour.type != eCivilian && neighbour.typeFlip != eCivilian)
-						{
-							desiredCivilianPosition = Position(neighbourCol, neighbourRow);
-						}
-					}
 				}
 			}
 
@@ -517,22 +472,6 @@ void toweringinferno::World::updateDynamics()
 					cell.typeFlip = eFloor;
 					cell.fire = 0.75f;
 				}
-			}
-			else if (cell.type == eCivilian 
-				&& (desiredCivilianPosition.first != col || desiredCivilianPosition.second != row))
-			{
-				cell.typeFlip = eFloor;
-				if (desiredCivilianPosition == m_player.getPos())
-				{
-					m_player.rescueCivilian();
-				}
-				else
-				{
-					Cell& targetCell = m_floorData.map[coordsToIndex(desiredCivilianPosition)];
-					targetCell.typeFlip = eCivilian;
-					targetCell.hp = cell.hp;
-				}
-				cell.hp = 1.0f;
 			}
 		}
 	}
@@ -560,21 +499,6 @@ void toweringinferno::World::updateDynamics()
 			}
 		}
 	}
-}
-
-bool toweringinferno::World::rescueCivilian(
-	const Position& pos
-	)
-{
-	if (isValidCoords(pos.first, pos.second) == false)
-	{
-		return false;
-	}
-
-	Cell& cell = m_floorData.map[coordsToIndex(pos)];
-	const bool isCivilian = cell.type == eCivilian;
-	cell.type = isCivilian ? eFloor : cell.type;
-	return isCivilian;
 }
 
 void toweringinferno::World::resetForNewFloor()
